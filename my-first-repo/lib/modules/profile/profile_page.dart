@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import '../../controllers/auth_controller.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -8,8 +10,293 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
+  final authController = Get.find<AuthController>();
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold();
+    final user = authController.currentUser.value;
+
+    return Scaffold(
+      backgroundColor: const Color.fromARGB(255, 238, 248, 247),
+      appBar: AppBar(
+        title: const Text("الملف الشخصي"),
+        backgroundColor: Colors.teal,
+        centerTitle: true,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            const SizedBox(height: 20),
+
+            // صورة البروفايل
+            CircleAvatar(
+              radius: 60,
+              backgroundColor: Colors.teal.shade100,
+              backgroundImage: user?.userImageUrl != null
+                  ? NetworkImage(user!.userImageUrl)
+                  : null,
+              child: user?.userImageUrl == null
+                  ? const Icon(Icons.person, size: 60, color: Colors.teal)
+                  : null,
+            ),
+            const SizedBox(height: 15),
+
+            // اسم المستخدم
+            Text(
+              "${user?.firstName ?? ''} ${user?.lastName ?? ''}",
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.teal,
+              ),
+            ),
+            const SizedBox(height: 5),
+
+            // نوع الحساب
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: _getRoleColor(user?.role),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                _getRoleText(user?.role),
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+              ),
+            ),
+            const SizedBox(height: 30),
+
+            // بطاقة المعلومات
+            Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  children: [
+                    _buildInfoRow(Icons.phone, "رقم الهاتف", user?.phone ?? ''),
+                    const Divider(),
+                    _buildInfoRow(Icons.cake, "تاريخ الميلاد", user?.birthDate ?? ''),
+                    const Divider(),
+                    _buildInfoRow(
+                      Icons.verified,
+                      "حالة الحساب",
+                      _getStatusText(user?.status),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // زر تعديل الملف الشخصي
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  _showEditDialog();
+                },
+                icon: const Icon(Icons.edit, color: Colors.white),
+                label: const Text(
+                  "تعديل الملف الشخصي",
+                  style: TextStyle(color: Colors.white, fontSize: 16),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.teal,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 15),
+
+            // زر تسجيل الخروج
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  _showLogoutConfirmation();
+                },
+                icon: const Icon(Icons.logout, color: Colors.white),
+                label: const Text(
+                  "تسجيل الخروج",
+                  style: TextStyle(color: Colors.white, fontSize: 16),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.teal, size: 24),
+          const SizedBox(width: 15),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(color: Colors.grey, fontSize: 12),
+              ),
+              Text(
+                value,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _getRoleColor(String? role) {
+    switch (role) {
+      case 'admin':
+        return Colors.purple;
+      case 'owner':
+        return Colors.orange;
+      case 'renter':
+        return Colors.blue;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String _getRoleText(String? role) {
+    switch (role) {
+      case 'admin':
+        return 'مدير';
+      case 'owner':
+        return 'مالك';
+      case 'renter':
+        return 'مستأجر';
+    }
+  }
+
+  String _getStatusText(String? status) {
+    switch (status) {
+      case 'approved':
+        return 'مفعّل ✓';
+      case 'pending':
+        return 'قيد الانتظار';
+      case 'rejected':
+        return 'مرفوض';
+      default:
+        return 'غير معروف';
+    }
+  }
+
+  void _showLogoutConfirmation() {
+    Get.defaultDialog(
+      title: "تسجيل الخروج",
+      middleText: "هل أنت متأكد من تسجيل الخروج؟",
+      textConfirm: "نعم",
+      textCancel: "إلغاء",
+      confirmTextColor: Colors.white,
+      buttonColor: Colors.red,
+      onConfirm: () {
+        Get.back();
+        authController.logout();
+      },
+    );
+  }
+
+  void _showEditDialog() {
+    final phoneController = TextEditingController(
+      text: authController.currentUser.value?.phone ?? '',
+    );
+    final passwordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
+
+    Get.dialog(
+      AlertDialog(
+        title: const Text("تعديل الملف الشخصي"),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: phoneController,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  labelText: "رقم الهاتف",
+                  prefixIcon: Icon(Icons.phone),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 15),
+              TextField(
+                controller: passwordController,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: "كلمة السر الجديدة",
+                  prefixIcon: Icon(Icons.lock),
+                  border: OutlineInputBorder(),
+                  hintText: "اتركها فارغة إذا لا تريد التغيير",
+                ),
+              ),
+              const SizedBox(height: 15),
+              TextField(
+                controller: confirmPasswordController,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: "تأكيد كلمة السر",
+                  prefixIcon: Icon(Icons.lock_outline),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text("إلغاء"),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              // التحقق من كلمة السر
+              if (passwordController.text.isNotEmpty) {
+                if (passwordController.text.length < 8) {
+                  Get.snackbar("خطأ", "كلمة السر يجب أن تكون 8 أحرف على الأقل",
+                      backgroundColor: Colors.red, colorText: Colors.white);
+                  return;
+                }
+                if (passwordController.text != confirmPasswordController.text) {
+                  Get.snackbar("خطأ", "كلمة السر غير متطابقة",
+                      backgroundColor: Colors.red, colorText: Colors.white);
+                  return;
+                }
+              }
+
+              // هنا يمكن إضافة API لتحديث البيانات
+              Get.back();
+              Get.snackbar("نجاح", "تم حفظ التغييرات",
+                  backgroundColor: Colors.green, colorText: Colors.white);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+            child: const Text("حفظ", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 }

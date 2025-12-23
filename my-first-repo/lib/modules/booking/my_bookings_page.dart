@@ -16,7 +16,7 @@ class MyBookingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final phone = authController.tempUser.phone ?? 'unknown';
+    final phone = authController.tempUser?.phone ?? 'unknown';
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Bookings'),

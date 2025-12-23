@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -11,11 +12,21 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
-  ->withMiddleware(function ($middleware) {
-    $middleware->alias([
-        'role' => \App\Http\Middleware\RoleMiddleware::class,
-    ]);
-})//to run admin in corectly way 
-    ->withExceptions(function (Exceptions $exceptions): void {
+    ->withMiddleware(function (Middleware $middleware): void {
         //
+    })
+    ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->renderable(function (\Throwable $e, $request) {
+            if (! $request->is('api/*')) {
+                return null;
+            }
+
+            $status = $e instanceof HttpExceptionInterface ? $e->getStatusCode() : 500;
+            $message = $status === 500 ? 'Server error: ' . $e->getMessage() : $e->getMessage();
+
+            return response()->json([
+                'message' => 'error',
+                'cause' => $message,
+            ], $status);
+        });
     })->create();

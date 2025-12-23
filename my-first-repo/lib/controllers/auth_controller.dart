@@ -1,12 +1,14 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:cozy_app/services/api_services.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:flutter/foundation.dart';
 import '../models/user_model.dart';
 import '../routes/app_routes.dart';
 
-enum UserType { renter, owner }
+enum UserType { tenant, owner }
 
 class AuthController extends GetxController {
   final AuthService _authService = AuthService();
@@ -24,15 +26,18 @@ class AuthController extends GetxController {
 
   Rx<File?> profileImage = Rx<File?>(null);
   Rx<File?> idImage = Rx<File?>(null);
+  Rx<Uint8List?> profileImageBytes = Rx<Uint8List?>(null);
+  Rx<Uint8List?> idImageBytes = Rx<Uint8List?>(null);
 
-  UserType userType = UserType.renter;
+  UserType userType = UserType.tenant;
 
   RxBool isLoading = false.obs;
   Rx<UserModel?> currentUser = Rx<UserModel?>(null);
   RxString token = "".obs;
-RxBool regPasswordVisible = true.obs;
+  RxBool regPasswordVisible = true.obs;
 
-  get tempUser => null;
+  UserModel? get tempUser => currentUser.value;
+
   void setUser(UserType type) {
     userType = type;
     update();
@@ -61,7 +66,12 @@ RxBool regPasswordVisible = true.obs;
 
   //  REGISTER
   Future<void> register() async {
-    if (profileImage.value == null || idImage.value == null) {
+    final hasProfileImage = kIsWeb
+        ? profileImageBytes.value != null
+        : profileImage.value != null;
+    final hasIdImage = kIsWeb ? idImageBytes.value != null : idImage.value != null;
+
+    if (!hasProfileImage || !hasIdImage) {
       Get.snackbar("خطأ", "الصور مطلوبة");
       return;
     }
@@ -75,19 +85,39 @@ RxBool regPasswordVisible = true.obs;
         firstName: regFirstNameController.text.trim(),
         lastName: regLastNameController.text.trim(),
         birthDate: regBirthdayController.text.trim(),
-        role: userType == UserType.owner ? "owner" : "tenant",
-        userImage: profileImage.value!,
-        idImage: idImage.value!,
+        role: userType == UserType.owner ? "owner" : "renter",
+        userImage: profileImage.value,
+        idImage: idImage.value,
+        userImageBytes: profileImageBytes.value,
+        idImageBytes: idImageBytes.value,
       );
 
       currentUser.value = res.user;
 
       Get.snackbar("نجاح", res.message);
       Get.offAllNamed(AppRoutes.login);
-    } catch (_) {
-      Get.snackbar("خطأ", "فشل إنشاء الحساب");
+    } catch (e) {
+      final message = e.toString().replaceFirst('Exception: ', '');
+      Get.snackbar("خطأ", message.isEmpty ? "فشل إنشاء الحساب" : message);
     } finally {
       isLoading.value = false;
     }
+  }
+
+  // LOGOUT
+  void logout() {
+    // مسح بيانات المستخدم
+    currentUser.value = null;
+    token.value = "";
+
+    // مسح حقول تسجيل الدخول
+    loginPhoneController.clear();
+    loginPasswordController.clear();
+
+    // الانتقال لصفحة تسجيل الدخول
+    Get.offAllNamed(AppRoutes.login);
+
+    Get.snackbar("تم", "تم تسجيل الخروج بنجاح",
+        backgroundColor: Colors.green, colorText: Colors.white);
   }
 }

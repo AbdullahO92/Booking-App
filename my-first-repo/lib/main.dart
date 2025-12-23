@@ -26,7 +26,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authController = Get.find<AuthController>();
-    final String initialRoute = authController.token.isNotEmpty
+    final String initialRoute = authController.token.value.isNotEmpty
         ? AppRoutes.mainPage
         : AppRoutes.OnBoardingBody;
     return GetMaterialApp(

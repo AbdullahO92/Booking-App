@@ -6,18 +6,17 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-// use Illuminate\Types\Relations\Role;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
+use Throwable;
+
 class AuthController extends Controller
 {
     public function register(Request $request){
 
-//        $request->validate([
-//
-//       ] );
         $validator = Validator::make($request->all(), [
             'phone'=>'required|string|unique:users,phone',
-            'role'=>'required|in:owner,tenant',
+            'role'=>'required|in:owner,renter',
             'password'=>'required|string|min:8',
             'first_name'=>'required|string',
             'last_name'=>'required|string',
@@ -32,35 +31,47 @@ class AuthController extends Controller
             return response()->json([
                 'message'=>'error',
                 'cause'=>$error,
-            ]);
+            ], 422);
         }
 
-        $userImagepath=$request->file('user_image')->store('user_images','public');
-        $idImagepath=$request->file('id_image')->store('id_images','public');
+        try {
+            $userImagepath=$request->file('user_image')->store('user_images','public');
+            $idImagepath=$request->file('id_image')->store('id_images','public');
 
-       $user=User::create([
-        'phone'=>$request->phone,
-        'role'=>$request->role,
-        'status'=>'pending',
-        'password'=>Hash::make($request->password),
-        'first_name'=>$request->first_name,
-        'last_name'=>$request->last_name,
-        'birth_date'=>$request->birth_date,
-        'user_image'=>$userImagepath,
-        'id_image'=>$idImagepath,
-       ]);
-       return response()->json([
-       'message'=>'Registered successfully . Waiting admin approval',
-       'user'=>$user,]);
+            $user=User::create([
+                'phone'=>$request->phone,
+                'role'=>$request->role,
+                'status'=>'pending',
+                'password'=>Hash::make($request->password),
+                'first_name'=>$request->first_name,
+                'last_name'=>$request->last_name,
+                'birth_date'=>$request->birth_date,
+                'user_image'=>$userImagepath,
+                'id_image'=>$idImagepath,
+            ]);
+        } catch (Throwable $e) {
+            Log::error('Register error: ' . $e->getMessage());
+
+            return response()->json([
+                'message' => 'error',
+                'cause' => 'Server error: ' . $e->getMessage(),
+            ], 500);
+        }
+
+        return response()->json([
+            'message'=>'Registered successfully . Waiting admin approval',
+            'user'=>$user,
+        ]);
+
     }
 
     public function login(Request $request){
         $request->validate([
-             'phone'=>'required|string',
-             'password'=>'required|string'
+            'phone'=>'required|string',
+            'password'=>'required|string'
         ]);
         $user=User::where('phone',$request->phone)->first();
-         if (!$user || !Hash::check($request->password, $user->password)) {
+        if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json([
                 'message'=>'Invalid credentials'
             ],401);
@@ -79,7 +90,8 @@ class AuthController extends Controller
 
         ]);
     }
-      public function adminLogin(Request $request)
+
+    public function adminLogin(Request $request)
     {
         $request->validate([
             'phone'    => 'required|string',
@@ -87,8 +99,8 @@ class AuthController extends Controller
         ]);
 
         $admin = User::where('phone', $request->phone)
-                     ->where('role', 'admin')
-                     ->first();
+            ->where('role', 'admin')
+            ->first();
 
         if (!$admin || !Hash::check($request->password, $admin->password)) {
             return response()->json([
@@ -96,7 +108,6 @@ class AuthController extends Controller
             ], 401);
         }
 
-        //haposha-> Admin always allowed to login
         $token = $admin->createToken('admin_token')->plainTextToken;
 
         return response()->json([
@@ -106,7 +117,6 @@ class AuthController extends Controller
         ]);
     }
 
-   // tokens->delete()= its mean that the user logged out form all devices
     public function logout(Request $request){
         $request->user()->currentAccessToken()->delete();
         return response()->json([
@@ -116,4 +126,3 @@ class AuthController extends Controller
     }
 
 }
-

@@ -3,6 +3,7 @@ import 'package:cozy_app/controllers/auth_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter/foundation.dart';
 
 class RegisterPage extends StatelessWidget {
   RegisterPage({super.key});
@@ -11,11 +12,43 @@ class RegisterPage extends StatelessWidget {
   final formKey = GlobalKey<FormState>();
   final ImagePicker picker = ImagePicker();
 
+  String? _requiredValidator(String? value) {
+    if (value == null || value.isEmpty) {
+      return "الحقل مطلوب";
+    }
+    return null;
+  }
+
+  String? _passwordValidator(String? value) {
+    if (value == null || value.isEmpty) {
+      return "الحقل مطلوب";
+    }
+    if (value.length < 8) {
+      return "كلمة المرور يجب أن تكون 8 أحرف على الأقل";
+    }
+    return null;
+  }
+
+  String? _birthDateValidator(String? value) {
+    if (value == null || value.isEmpty) {
+      return "الحقل مطلوب";
+    }
+    final datePattern = RegExp(r'^\d{4}-\d{2}-\d{2}$');
+    if (!datePattern.hasMatch(value)) {
+      return "الصيغة المطلوبة: YYYY-MM-DD";
+    }
+    return null;
+  }
+
   // Profile Image
   Future<void> pickProfileImage() async {
     final XFile? picked = await picker.pickImage(source: ImageSource.gallery);
     if (picked != null) {
-      authController.profileImage.value = File(picked.path);
+      if (kIsWeb) {
+        authController.profileImageBytes.value = await picked.readAsBytes();
+      } else {
+        authController.profileImage.value = File(picked.path);
+      }
     }
   }
 
@@ -23,7 +56,11 @@ class RegisterPage extends StatelessWidget {
   Future<void> pickIdImage() async {
     final XFile? picked = await picker.pickImage(source: ImageSource.gallery);
     if (picked != null) {
-      authController.idImage.value = File(picked.path);
+      if (kIsWeb) {
+        authController.idImageBytes.value = await picked.readAsBytes();
+      } else {
+        authController.idImage.value = File(picked.path);
+      }
     }
   }
 
@@ -45,22 +82,28 @@ class RegisterPage extends StatelessWidget {
 
               // Profile Image
               Obx(() {
+                final bytes = authController.profileImageBytes.value;
+                final ImageProvider<Object>? profileImageProvider = kIsWeb
+                    ? (bytes != null ? MemoryImage(bytes) : null)
+                    : (authController.profileImage.value != null
+                    ? FileImage(authController.profileImage.value!)
+                    : null);
                 return GestureDetector(
                   onTap: pickProfileImage,
                   child: CircleAvatar(
                     radius: 55,
                     backgroundColor: Colors.grey.shade300,
-                    backgroundImage: authController.profileImage.value != null
-                        ? FileImage(authController.profileImage.value!)
-                        : null,
-                    child: authController.profileImage.value == null
+                    backgroundImage: profileImageProvider,
+                    child: (kIsWeb ? bytes == null : authController.profileImage.value == null)
                         ? const Icon(Icons.camera_alt,
-                            size: 35, color: Colors.black54)
+                        size: 35, color: Colors.black54)
                         : null,
                   ),
                 );
               }),
-              const SizedBox(height: 20),
+              const SizedBox(height: 5),
+              const Text("صورة البروفايل (مطلوبة)", style: TextStyle(fontSize: 12, color: Colors.grey)),
+              const SizedBox(height: 15),
 
               // PHONE
               TextFormField(
@@ -86,24 +129,23 @@ class RegisterPage extends StatelessWidget {
 
               // PASSWORD
               Obx(() => TextFormField(
-                    controller: authController.regPasswordController,
-                    obscureText: authController.regPasswordVisible.value,
-                    decoration: InputDecoration(
-                      labelText: "Password",
-                      prefixIcon: const Icon(Icons.lock),
-                      filled: true,
-                      fillColor: const Color.fromARGB(118, 212, 214, 188),
-                      suffixIcon: IconButton(
-                        icon: Icon(authController.regPasswordVisible.value
-                            ? Icons.visibility
-                            : Icons.visibility_off),
-                        onPressed: () => authController.regPasswordVisible.value =
-                            !authController.regPasswordVisible.value,
-                      ),
-                    ),
-                    validator: (v) =>
-                        v == null || v.isEmpty ? "الحقل مطلوب" : null,
-                  )),
+                controller: authController.regPasswordController,
+                obscureText: authController.regPasswordVisible.value,
+                decoration: InputDecoration(
+                  labelText: "Password (8+ characters)",
+                  prefixIcon: const Icon(Icons.lock),
+                  filled: true,
+                  fillColor: const Color.fromARGB(118, 212, 214, 188),
+                  suffixIcon: IconButton(
+                    icon: Icon(authController.regPasswordVisible.value
+                        ? Icons.visibility
+                        : Icons.visibility_off),
+                    onPressed: () => authController.regPasswordVisible.value =
+                    !authController.regPasswordVisible.value,
+                  ),
+                ),
+                validator: _passwordValidator,
+              )),
               const SizedBox(height: 10),
 
               // FIRST NAME
@@ -115,8 +157,7 @@ class RegisterPage extends StatelessWidget {
                   filled: true,
                   fillColor: Color.fromARGB(118, 212, 214, 188),
                 ),
-                validator: (v) =>
-                    v == null || v.isEmpty ? "الحقل مطلوب" : null,
+                validator: _requiredValidator,
               ),
               const SizedBox(height: 10),
 
@@ -129,12 +170,10 @@ class RegisterPage extends StatelessWidget {
                   filled: true,
                   fillColor: Color.fromARGB(118, 212, 214, 188),
                 ),
-                validator: (v) =>
-                    v == null || v.isEmpty ? "الحقل مطلوب" : null,
+                validator: _requiredValidator,
               ),
               const SizedBox(height: 10),
 
-             
               TextFormField(
                 controller: authController.regBirthdayController,
                 decoration: const InputDecoration(
@@ -143,41 +182,49 @@ class RegisterPage extends StatelessWidget {
                   filled: true,
                   fillColor: Color.fromARGB(118, 212, 214, 188),
                 ),
-                validator: (v) =>
-                    v == null || v.isEmpty ? "الحقل مطلوب" : null,
+                validator: _birthDateValidator,
               ),
               const SizedBox(height: 20),
 
-              
               Row(
                 children: [
                   const Icon(Icons.credit_card, size: 30),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Obx(() => ElevatedButton(
-                          onPressed: pickIdImage,
-                          child: Text(
-                            authController.idImage.value == null
-                                ? "Upload ID Image"
-                                : "ID Image Selected",
-                            style: const TextStyle(
-                                color: Color.fromARGB(255, 26, 107, 81)),
-                          ),
-                        )),
+                      onPressed: pickIdImage,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: (kIsWeb
+                            ? authController.idImageBytes.value != null
+                            : authController.idImage.value != null)
+                            ? Colors.green.shade100
+                            : null,
+                      ),
+                      child: Text(
+                        kIsWeb
+                            ? (authController.idImageBytes.value == null
+                            ? "Upload ID Image (مطلوب)"
+                            : "✓ ID Image Selected")
+                            : authController.idImage.value == null
+                            ? "Upload ID Image (مطلوب)"
+                            : "✓ ID Image Selected",
+                        style: const TextStyle(
+                            color: Color.fromARGB(255, 26, 107, 81)),
+                      ),
+                    )),
                   ),
                 ],
               ),
               const SizedBox(height: 25),
 
-           
               GetBuilder<AuthController>(
                 builder: (controller) {
                   return Column(
                     children: [
                       ListTile(
-                        title: const Text("Tenant"),
+                        title: const Text("Tenant (مستأجر)"),
                         leading: Radio<UserType>(
-                          value: UserType.renter,
+                          value: UserType.tenant,
                           groupValue: controller.userType,
                           onChanged: (value) {
                             if (value != null) controller.setUser(value);
@@ -185,7 +232,7 @@ class RegisterPage extends StatelessWidget {
                         ),
                       ),
                       ListTile(
-                        title: const Text("Owner"),
+                        title: const Text("Owner (مالك)"),
                         leading: Radio<UserType>(
                           value: UserType.owner,
                           groupValue: controller.userType,
@@ -201,24 +248,23 @@ class RegisterPage extends StatelessWidget {
 
               const SizedBox(height: 20),
 
-             
               Obx(() => authController.isLoading.value
                   ? const CircularProgressIndicator()
                   : SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          if (formKey.currentState!.validate()) {
-                            authController.register();
-                          }
-                        },
-                        child: const Text(
-                          "Create Account",
-                          style: TextStyle(
-                              color: Color.fromARGB(255, 26, 107, 81)),
-                        ),
-                      ),
-                    )),
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    if (formKey.currentState!.validate()) {
+                      authController.register();
+                    }
+                  },
+                  child: const Text(
+                    "Create Account",
+                    style: TextStyle(
+                        color: Color.fromARGB(255, 26, 107, 81)),
+                  ),
+                ),
+              )),
             ],
           ),
         ),

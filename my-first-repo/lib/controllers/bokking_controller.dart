@@ -6,7 +6,6 @@ import 'auth_controller.dart';
 class BookingController extends GetxController {
   final RxList<Booking> bookings = <Booking>[].obs;
 
-  // بسيط: ID تزايدي للحجوزات المحلية
   int _nextId = 1;
 
   // احفظ حجز محلياً (لاحقًا تستبدل باستدعاء API)
@@ -22,7 +21,7 @@ class BookingController extends GetxController {
     final total = pricePerNight * effectiveNights;
 
     final auth = Get.find<AuthController>();
-    final userPhone = auth.tempUser.phone ?? 'unknown';
+    final userPhone = auth.tempUser?.phone ?? 'unknown';
 
     final booking = Booking(
       id: _nextId++,
@@ -49,4 +48,3 @@ class BookingController extends GetxController {
     update();
   }
 }
-//لاحظة: لاحقًا تستبدل createBooking باستدعاء POST الى Laravel (مثلاً POST /api/bookings) وترسل بيانات الحجز ومع التوكين.

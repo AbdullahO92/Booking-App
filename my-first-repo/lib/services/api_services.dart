@@ -3,10 +3,20 @@ import 'dart:io';
 import 'package:cozy_app/models/auth_response_model.dart';
 // ignore: depend_on_referenced_packages
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 import '../models/register_response_model.dart';
 
 class AuthService {
- static const String baseUrl = "http://192.168.90.3:8000/api";
+ //static const String baseUrl = "http://192.168.90.3:8000/api";
+  static String get baseUrl {
+    if (kIsWeb) {
+      return "http://127.0.0.1:8000/api";
+    }
+    if (Platform.isAndroid) {
+      return "http://10.0.2.2:8000/api";
+    }
+    return "http://127.0.0.1:8000/api";
+  }
 
 
   //  LOGIN

@@ -31,23 +31,42 @@ Route::middleware('auth:sanctum')->group(function(){
     //اضافة شقة
     Route::post('/apartment',[ApartmentController::class,'store']);
     //update
-    Route::post('/apartment/{id}',[ApartmentController::class,'update']);
+    Route::put('/apartment/{id}',[ApartmentController::class,'update']);
     //delete
     Route::delete('/apartment/{id}',[ApartmentController::class,'destroy']);
     //ownerapartment
     Route::get('/my_apartment',[ApartmentController::class,'myApartment']);
+
+        //الحجوزات
+        //قسم المستأجر
+        //عرض جميع حجوزات المستخدم
+        Route::get('user/{id}/bookings',[UserController::class,'getUserBookings']);
+        //إضافة حجز مع عدم التضارب
+        Route::post('/bookings',[BookingController::class,'addBooking']);
+        //إلغاء حجز
+        Route::put('/bookings/{id}/cancel',[BookingController::class,'cancelBooking']);
+        //التعديل على حجز
+        Route::put('/bookings/{id}/update',[BookingController::class,'updateBooking']);
+
+        //قسم المؤجر
+        //عرض الحجوزات قيد الانتظار
+        Route::get('owner/bookings/pending', [UserController::class, 'pendingBookings']);
+        //قبول الحجز
+        Route::post('owner/bookings/{id}/approve', [UserController::class, 'approve']);
+        //رفض الحجز
+        Route::post('owner/bookings/{id}/reject', [UserController::class, 'reject']);
 });
 
 
 Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
 
-    
+
     Route::get('/admin/users/pending', [AdminUserController::class, 'pendingUsers']);
 
-    
+
     Route::put('/admin/users/{id}/approve', [AdminUserController::class, 'approveUser']);
 
-    
+
     Route::put('/admin/users/{id}/reject', [AdminUserController::class, 'rejectUser']);
     //جيب شقق قيد الانتظار
      Route::get('/admin/apartment/pending', [AdminApartmentController::class, 'pendingApartment']);
@@ -58,24 +77,6 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     // الرفض
     Route::put('/admin/apartment/{id}/reject', [AdminApartmentController::class, 'rejectedapartment']);
 
-    //الحجوزات
-    //قسم المستأجر
-    //عرض جميع حجوزات المستخدم
-    Route::get('user/{id}/bookings',[UserController::class,'getUserBookings']);
-    //إضافة حجز مع عدم التضارب
-    Route::post('/bookings',[BookingController::class,'addBooking']);
-    //إلغاء حجز
-    Route::put('/bookings/{id}/cancel',[BookingController::class,'cancelBooking']);
-    //التعديل على حجز
-    Route::put('/bookings/{id}/update',[BookingController::class,'updateBooking']);
-
-    //قسم المؤجر
-    //عرض الحجوزات قيد الانتظار
-    Route::get('owner/bookings/pending', [UserController::class, 'pendingBookings']);
-    //قبول الحجز
-    Route::post('owner/bookings/{id}/approve', [UserController::class, 'approve']);
-    //رفض الحجز
-    Route::post('owner/bookings/{id}/reject', [UserController::class, 'reject']);
 
 });
 

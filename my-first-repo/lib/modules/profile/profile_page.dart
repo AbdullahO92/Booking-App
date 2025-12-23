@@ -188,6 +188,8 @@ class _ProfilePageState extends State<ProfilePage> {
         return 'مالك';
       case 'renter':
         return 'مستأجر';
+      default:
+        return 'مستخدم';
     }
   }
 
@@ -273,7 +275,6 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
           ElevatedButton(
             onPressed: () {
-              // التحقق من كلمة السر
               if (passwordController.text.isNotEmpty) {
                 if (passwordController.text.length < 8) {
                   Get.snackbar("خطأ", "كلمة السر يجب أن تكون 8 أحرف على الأقل",
@@ -287,7 +288,6 @@ class _ProfilePageState extends State<ProfilePage> {
                 }
               }
 
-              // هنا يمكن إضافة API لتحديث البيانات
               Get.back();
               Get.snackbar("نجاح", "تم حفظ التغييرات",
                   backgroundColor: Colors.green, colorText: Colors.white);

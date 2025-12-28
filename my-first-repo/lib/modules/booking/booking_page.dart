@@ -8,7 +8,6 @@ import 'package:cozy_app/modules/booking/my_bookings_page.dart';
 import '../../controllers/auth_controller.dart';
 import '../../modules/home/apartment_model.dart';
 
-/// صفحة الحجز (جديد أو تعديل)
 class BookingPage extends StatefulWidget {
   final Apartment apartment;
   final Booking? oldBooking;
@@ -34,11 +33,31 @@ class _BookingPageState extends State<BookingPage> {
   @override
   void initState() {
     super.initState();
-    
+    _checkIfOwner();
+
     if (widget.oldBooking != null) {
       fromDate = widget.oldBooking!.fromDate;
       toDate = widget.oldBooking!.toDate;
       guests = widget.oldBooking!.guests;
+    }
+  }
+
+  void _checkIfOwner() {
+    final currentUserPhone = authController.currentUser.value?.phone;
+    final apartmentOwnerPhone = widget.apartment.ownerPhone;
+
+    if (currentUserPhone != null &&
+        apartmentOwnerPhone != null &&
+        currentUserPhone == apartmentOwnerPhone) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Get.back();
+        Get.snackbar(
+          "غير مسموح",
+          "لا يمكنك حجز شقتك الخاصة",
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+      });
     }
   }
 
@@ -77,19 +96,24 @@ class _BookingPageState extends State<BookingPage> {
   }
 
   void handleBookNow() {
+    final currentUserPhone = authController.currentUser.value?.phone;
+    final apartmentOwnerPhone = widget.apartment.ownerPhone;
+
+    if (currentUserPhone != null &&
+        apartmentOwnerPhone != null &&
+        currentUserPhone == apartmentOwnerPhone) {
+      Get.snackbar("غير مسموح", "لا يمكنك حجز شقتك الخاصة",
+          backgroundColor: Colors.red, colorText: Colors.white);
+      return;
+    }
+
     if (fromDate == null || toDate == null) {
       Get.snackbar('خطأ', 'اختر تاريخ الوصول والمغادرة',
           backgroundColor: Colors.orange, colorText: Colors.white);
       return;
     }
-    if (toDate!.isBefore(fromDate!)) {
-      Get.snackbar('خطأ', 'تاريخ المغادرة يجب أن يكون بعد الوصول',
-          backgroundColor: Colors.orange, colorText: Colors.white);
-      return;
-    }
 
     if (widget.oldBooking != null) {
-     
       bookingController.cancelBooking(widget.oldBooking!.id);
     }
 
@@ -100,139 +124,182 @@ class _BookingPageState extends State<BookingPage> {
       guests: guests,
     );
 
-    Get.snackbar('تم', widget.oldBooking != null ? 'تم تعديل الحجز بنجاح' : 'تم إنشاء الحجز بنجاح',
+    Get.snackbar('تم',
+        widget.oldBooking != null ? 'تم تعديل الحجز بنجاح' : 'تم إنشاء الحجز بنجاح',
         backgroundColor: Colors.green, colorText: Colors.white);
 
-  
     Get.off(() => MyBookingsPage());
   }
 
   void handleCancelBooking() {
     if (widget.oldBooking != null) {
       bookingController.cancelBooking(widget.oldBooking!.id);
-      Get.snackbar('تم', 'تم إلغاء الحجز', backgroundColor: Colors.red, colorText: Colors.white);
+      Get.snackbar('تم', 'تم إلغاء الحجز',
+          backgroundColor: Colors.red, colorText: Colors.white);
       Get.off(() => MyBookingsPage());
     }
+  }
+
+  Widget _buildImage(String path) {
+    if (path.isEmpty) {
+      return Container(
+        height: 200,
+        color: Colors.grey[300],
+        child: const Icon(Icons.apartment, size: 60, color: Colors.grey),
+      );
+    }
+
+    if (path.startsWith("http")) {
+      return Image.network(
+        path,
+        height: 200,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => Container(
+          height: 200,
+          color: Colors.grey[300],
+          child: const Icon(Icons.broken_image, size: 60, color: Colors.grey),
+        ),
+      );
+    }
+
+    return Image.asset(
+      path,
+      height: 200,
+      width: double.infinity,
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => Container(
+        height: 200,
+        color: Colors.grey[300],
+        child: const Icon(Icons.broken_image, size: 60, color: Colors.grey),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final apt = widget.apartment;
     return Scaffold(
-      appBar: AppBar(title: Text(widget.oldBooking != null ? 'Edit Booking - ${apt.name}' : 'Book - ${apt.name}'), backgroundColor: Colors.teal),
+      appBar: AppBar(
+        title: Text(widget.oldBooking != null
+            ? 'Edit Booking - ${apt.name}'
+            : 'Book - ${apt.name}'),
+        backgroundColor: Colors.teal,
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-           
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: Image.asset(
-                apt.image,
-                height: 200,
-                width: double.infinity,
-                fit: BoxFit.cover,
-              ),
+              child: _buildImage(apt.image),
             ),
             const SizedBox(height: 12),
-            Text(apt.name, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            Text(apt.name,
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
-            Text('\$${apt.price} per night', style: const TextStyle(fontSize: 16, color: Colors.green)),
+            Text('\$${apt.price.toStringAsFixed(0)} per night',
+                style: const TextStyle(fontSize: 16, color: Colors.green)),
             const SizedBox(height: 6),
-            if (apt.ownerPhone != null)
-              Text('Owner: ${apt.ownerPhone}', style: const TextStyle(fontSize: 14, color: Colors.black54)),
+            if (apt.ownerPhone != null && apt.ownerPhone!.isNotEmpty)
+              Text('Owner: ${apt.ownerPhone}',
+                  style: const TextStyle(fontSize: 14, color: Colors.black54)),
             const SizedBox(height: 20),
 
-            // FROM date
-            Text('From', style: const TextStyle(fontWeight: FontWeight.bold)),
+            const Text('From', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: pickFromDate,
-                    child: Text(fromDate == null ? 'Choose arrival date' : fromDate!.toLocal().toString().split(' ')[0]),
-                  ),
+            Row(children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: pickFromDate,
+                  child: Text(fromDate == null
+                      ? 'Choose arrival date'
+                      : fromDate!.toLocal().toString().split(' ')[0]),
                 ),
-              ],
-            ),
+              ),
+            ]),
             const SizedBox(height: 12),
 
-           
-            Text('To', style: const TextStyle(fontWeight: FontWeight.bold)),
+            const Text('To', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: pickToDate,
-                    child: Text(toDate == null ? 'Choose departure date' : toDate!.toLocal().toString().split(' ')[0]),
-                  ),
+            Row(children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: pickToDate,
+                  child: Text(toDate == null
+                      ? 'Choose departure date'
+                      : toDate!.toLocal().toString().split(' ')[0]),
                 ),
-              ],
-            ),
+              ),
+            ]),
             const SizedBox(height: 12),
 
-         
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text('Guests', style: TextStyle(fontWeight: FontWeight.bold)),
-                Row(
-                  children: [
-                    IconButton(
-                      onPressed: () => setState(() { if (guests > 1) guests--; }),
-                      icon: const Icon(Icons.remove_circle_outline),
-                    ),
-                    Text('$guests'),
-                    IconButton(
-                      onPressed: () => setState(() { guests++; }),
-                      icon: const Icon(Icons.add_circle_outline),
-                    ),
-                  ],
-                )
+                Row(children: [
+                  IconButton(
+                    onPressed: () => setState(() {
+                      if (guests > 1) guests--;
+                    }),
+                    icon: const Icon(Icons.remove_circle_outline),
+                  ),
+                  Text('$guests'),
+                  IconButton(
+                    onPressed: () => setState(() => guests++),
+                    icon: const Icon(Icons.add_circle_outline),
+                  ),
+                ]),
               ],
             ),
             const SizedBox(height: 20),
 
-       
             Card(
               color: Colors.grey[100],
               child: Padding(
                 padding: const EdgeInsets.all(12),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Nights: ${getNights()}'),
-                  const SizedBox(height: 6),
-                  Text('Price per night: \$${apt.price}'),
-                  const SizedBox(height: 6),
-                  Text('Total: \$${getTotal().toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                ]),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Nights: ${getNights()}'),
+                    const SizedBox(height: 6),
+                    Text('Price per night: \$${apt.price.toStringAsFixed(0)}'),
+                    const SizedBox(height: 6),
+                    Text('Total: \$${getTotal().toStringAsFixed(2)}',
+                        style: const TextStyle(fontWeight: FontWeight.bold)),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 20),
 
-          
-            Row(
-              children: [
+            Row(children: [
+              Expanded(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.teal,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  onPressed: handleBookNow,
+                  child: Text(
+                      widget.oldBooking != null ? 'Update Booking' : 'Book Now',
+                      style: const TextStyle(fontSize: 18, color: Colors.white)),
+                ),
+              ),
+              if (widget.oldBooking != null) ...[
+                const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: handleBookNow,
-                    child: Text(widget.oldBooking != null ? 'Update Booking' : 'Book Now', style: const TextStyle(fontSize: 18)),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                    onPressed: handleCancelBooking,
+                    child: const Text('Cancel',
+                        style: TextStyle(fontSize: 18, color: Colors.white)),
                   ),
                 ),
-                if (widget.oldBooking != null) ...[
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                      onPressed: handleCancelBooking,
-                      child: const Text('Cancel', style: TextStyle(fontSize: 18)),
-                    ),
-                  ),
-                ]
-              ],
-            ),
+              ]
+            ]),
           ],
         ),
       ),

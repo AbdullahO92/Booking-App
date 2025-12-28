@@ -2,7 +2,7 @@ import 'package:cozy_app/controllers/auth_controller.dart';
 import 'package:cozy_app/modules/apartment/apartment_details_page.dart';
 import 'package:cozy_app/modules/home/add_apartment_page.dart';
 import 'package:cozy_app/modules/home/apartment_model.dart';
-import 'package:cozy_app/modules/home/dummy_apartments.dart';
+import 'package:cozy_app/services/apartment_service.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'apartment_card.dart';
@@ -16,11 +16,35 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final authController = Get.find<AuthController>();
+  final ApartmentService _apartmentService = ApartmentService();
 
-  List<Apartment> filteredApartments = dummyApartments;
+  List<Apartment> allApartments = [];
+  List<Apartment> filteredApartments = [];
+  bool isLoading = true;
 
-  String selectedSearchType = "الاسم"; // النوع الافتراضي
+  String selectedSearchType = "الاسم";
   TextEditingController searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    fetchApartments();
+  }
+
+  Future<void> fetchApartments() async {
+    try {
+      setState(() => isLoading = true);
+      final data = await _apartmentService.getAllApartments();
+      setState(() {
+        allApartments = data.map((item) => Apartment.fromJson(item)).toList();
+        filteredApartments = allApartments;
+        isLoading = false;
+      });
+    } catch (e) {
+      setState(() => isLoading = false);
+      debugPrint("Error fetching apartments: $e");
+    }
+  }
 
   void search(String query) {
     final q = query.toLowerCase();
@@ -28,19 +52,19 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       switch (selectedSearchType) {
         case "الاسم":
-          filteredApartments = dummyApartments
+          filteredApartments = allApartments
               .where((apt) => apt.name.toLowerCase().contains(q))
               .toList();
           break;
 
         case "المدينة":
-          filteredApartments = dummyApartments
+          filteredApartments = allApartments
               .where((apt) => apt.city.toLowerCase().contains(q))
               .toList();
           break;
 
         case "المحافظة":
-          filteredApartments = dummyApartments
+          filteredApartments = allApartments
               .where((apt) => apt.governorate.toLowerCase().contains(q))
               .toList();
           break;
@@ -49,23 +73,22 @@ class _HomePageState extends State<HomePage> {
           double? price = double.tryParse(query);
           filteredApartments = price == null
               ? []
-              : dummyApartments.where((apt) => apt.price <= price).toList();
+              : allApartments.where((apt) => apt.price <= price).toList();
           break;
 
         case "عدد الغرف":
           int? rooms = int.tryParse(query);
           filteredApartments = rooms == null
               ? []
-              : dummyApartments.where((apt) => apt.rooms >= rooms).toList();
+              : allApartments.where((apt) => apt.rooms >= rooms).toList();
           break;
 
         default:
-          filteredApartments = dummyApartments;
+          filteredApartments = allApartments;
       }
     });
   }
 
- 
   void showSearchOptions() {
     showModalBottomSheet(
       context: context,
@@ -79,9 +102,7 @@ class _HomePageState extends State<HomePage> {
             children: [
               const Text("اختر طريقة البحث:",
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-
               const SizedBox(height: 16),
-
               buildSearchTypeOption("الاسم"),
               buildSearchTypeOption("المدينة"),
               buildSearchTypeOption("المحافظة"),
@@ -94,7 +115,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
- 
   Widget buildSearchTypeOption(String type) {
     return ListTile(
       title: Text(type),
@@ -106,27 +126,28 @@ class _HomePageState extends State<HomePage> {
       ),
       onTap: () {
         setState(() => selectedSearchType = type);
-        Navigator.pop(context); // إغلاق البوتوم شيت
+        Navigator.pop(context);
       },
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final userRole = authController.currentUser.value?.role;
+    final isOwner = userRole == 'owner';
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("Available Apartments"),
         backgroundColor: Colors.teal,
       ),
-
       body: Column(
         children: [
-          // ================== 🔍 صندوق البحث ==================
+          // صندوق البحث
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
-                // زر اختيار نوع البحث
                 Row(
                   children: [
                     Expanded(
@@ -141,10 +162,7 @@ class _HomePageState extends State<HomePage> {
                     )
                   ],
                 ),
-
                 const SizedBox(height: 10),
-
-                // صندوق البحث
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   decoration: BoxDecoration(
@@ -166,31 +184,43 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
 
-          // ================== قائمة الشقق ==================
+          // قائمة الشقق
           Expanded(
-            child: ListView.builder(
-              itemCount: filteredApartments.length,
-              itemBuilder: (context, index) {
-                final apt = filteredApartments[index];
-                return ApartmentCard(
-                  apartment: apt,
-                  onTap: () => Get.to(() => ApartmentDetailsPage(apartment: apt)),
-                );
-              },
+            child: isLoading
+                ? const Center(child: CircularProgressIndicator(color: Colors.teal))
+                : filteredApartments.isEmpty
+                ? const Center(
+              child: Text(
+                "لا توجد شقق متاحة",
+                style: TextStyle(fontSize: 18, color: Colors.grey),
+              ),
+            )
+                : RefreshIndicator(
+              onRefresh: fetchApartments,
+              child: ListView.builder(
+                itemCount: filteredApartments.length,
+                itemBuilder: (context, index) {
+                  final apt = filteredApartments[index];
+                  return ApartmentCard(
+                    apartment: apt,
+                    onTap: () => Get.to(() => ApartmentDetailsPage(apartment: apt)),
+                  );
+                },
+              ),
             ),
           ),
         ],
       ),
 
       // زر إضافة شقة للمالك
-      floatingActionButton: authController.userType == UserType.owner
+      floatingActionButton: isOwner
           ? FloatingActionButton(
-              backgroundColor: Colors.teal,
-              child: const Icon(Icons.add),
-              onPressed: () {
-                Get.to(() => const AddApartmentPage());
-              },
-            )
+        backgroundColor: Colors.teal,
+        child: const Icon(Icons.add, color: Colors.white),
+        onPressed: () {
+          Get.to(() => const AddApartmentPage());
+        },
+      )
           : null,
     );
   }

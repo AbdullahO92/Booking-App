@@ -34,7 +34,7 @@ class _ProfilePageState extends State<ProfilePage> {
               radius: 60,
               backgroundColor: Colors.teal.shade100,
               backgroundImage: user?.userImageUrl != null
-                  ? NetworkImage(user!.userImageUrl)
+                  ? NetworkImage(user!.userImageUrl!)
                   : null,
               child: user?.userImageUrl == null
                   ? const Icon(Icons.person, size: 60, color: Colors.teal)

@@ -7,7 +7,6 @@ import 'package:cozy_app/modules/booking/my_bookings_page.dart';
 import 'package:cozy_app/modules/favorites/favorites_page.dart';
 import 'package:cozy_app/modules/profile/profile_page.dart';
 
-
 class MainPage extends StatefulWidget {
   const MainPage({super.key});
 
@@ -22,37 +21,39 @@ class _MainPageState extends State<MainPage> {
 
   @override
   Widget build(BuildContext context) {
-    final isOwner = authController.userType == UserType.owner;
+    // التحقق من role المستخدم من البيانات المسجلة
+    final userRole = authController.currentUser.value?.role;
+    final isOwner = userRole == 'owner';
 
     // الصفحات حسب نوع المستخدم
     final screens = isOwner
         ? [
-            HomePage(),
-            MyApartmentsPage(),   // الشقق الخاصة بالمالك
-            FavoritesPage(),
-            ProfilePage(),
-          ]
+      HomePage(),
+      MyApartmentsPage(),   // الشقق الخاصة بالمالك
+      FavoritesPage(),
+      ProfilePage(),
+    ]
         : [
-            HomePage(),
-            MyBookingsPage(),     // الحجوزات للمستأجر
-            FavoritesPage(),
-            ProfilePage(),
-          ];
+      HomePage(),
+      MyBookingsPage(),     // الحجوزات للمستأجر
+      FavoritesPage(),
+      ProfilePage(),
+    ];
 
     // الأيقونات حسب نوع المستخدم
     final navItems = isOwner
         ? const [
-            BottomNavigationBarItem(icon: Icon(Icons.home), label: "الرئيسية"),
-            BottomNavigationBarItem(icon: Icon(Icons.home_work), label: "شُقَقي"),
-            BottomNavigationBarItem(icon: Icon(Icons.favorite), label: "المفضلة"),
-            BottomNavigationBarItem(icon: Icon(Icons.person), label: "حسابي"),
-          ]
+      BottomNavigationBarItem(icon: Icon(Icons.home), label: "الرئيسية"),
+      BottomNavigationBarItem(icon: Icon(Icons.home_work), label: "شُقَقي"),
+      BottomNavigationBarItem(icon: Icon(Icons.favorite), label: "المفضلة"),
+      BottomNavigationBarItem(icon: Icon(Icons.person), label: "حسابي"),
+    ]
         : const [
-            BottomNavigationBarItem(icon: Icon(Icons.home), label: "الرئيسية"),
-            BottomNavigationBarItem(icon: Icon(Icons.list_alt), label: "حجوزاتي"),
-            BottomNavigationBarItem(icon: Icon(Icons.favorite), label: "المفضلة"),
-            BottomNavigationBarItem(icon: Icon(Icons.person), label: "حسابي"),
-          ];
+      BottomNavigationBarItem(icon: Icon(Icons.home), label: "الرئيسية"),
+      BottomNavigationBarItem(icon: Icon(Icons.list_alt), label: "حجوزاتي"),
+      BottomNavigationBarItem(icon: Icon(Icons.favorite), label: "المفضلة"),
+      BottomNavigationBarItem(icon: Icon(Icons.person), label: "حسابي"),
+    ];
 
     return Scaffold(
       body: screens[currentIndex],
@@ -69,4 +70,3 @@ class _MainPageState extends State<MainPage> {
     );
   }
 }
-

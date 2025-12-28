@@ -8,7 +8,6 @@ import 'package:http_parser/http_parser.dart';
 import '../models/register_response_model.dart';
 
 class AuthService {
-  //static const String baseUrl = "http://192.168.90.3:8000/api";
   static String get baseUrl {
     if (kIsWeb) {
       return "http://127.0.0.1:8000/api";
@@ -51,27 +50,48 @@ class AuthService {
     return null;
   }
 
-
   //  LOGIN
   Future<LoginResponseModel> login({
     required String phone,
     required String password,
   }) async {
-    final response = await
-    http.post(
+    debugPrint("=== Login Debug ===");
+    debugPrint("Phone: $phone");
+    debugPrint("URL: $baseUrl/login");
+
+    final response = await http.post(
       Uri.parse("$baseUrl/login"),
-      headers: {"Accept": "application/json"},
-      body: {
+      headers: {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+      },
+      body: jsonEncode({
         "phone": phone,
         "password": password,
-      },
+      }),
     );
+
+    debugPrint("Response status: ${response.statusCode}");
+    debugPrint("Response body: ${response.body}");
 
     if (response.statusCode == 200) {
       return LoginResponseModel.fromJson(jsonDecode(response.body));
     } else {
-      throw Exception("Login failed");
+      final bodyJson = _tryDecodeJson(response.body, response.headers["content-type"]);
+      final errorMsg = _extractErrorMessage(bodyJson) ?? "بيانات الدخول غير صحيحة";
+      throw Exception(errorMsg);
     }
+  }
+
+  // LOGOUT
+  Future<void> logout({required String token}) async {
+    await http.delete(
+      Uri.parse("$baseUrl/logout"),
+      headers: {
+        "Accept": "application/json",
+        "Authorization": "Bearer $token",
+      },
+    );
   }
 
   //  REGISTER
@@ -87,8 +107,7 @@ class AuthService {
     Uint8List? userImageBytes,
     Uint8List? idImageBytes,
   }) async {
-    final request =
-    http.MultipartRequest("POST", Uri.parse("$baseUrl/register"));
+    final request = http.MultipartRequest("POST", Uri.parse("$baseUrl/register"));
     request.headers["Accept"] = "application/json";
 
     request.fields.addAll({
@@ -102,14 +121,9 @@ class AuthService {
 
     debugPrint("=== Register Debug ===");
     debugPrint("kIsWeb: $kIsWeb");
-    debugPrint("userImageBytes: ${userImageBytes != null ? '${userImageBytes.length} bytes' : 'null'}");
-    debugPrint("idImageBytes: ${idImageBytes != null ? '${idImageBytes.length} bytes' : 'null'}");
-    debugPrint("userImage: ${userImage?.path ?? 'null'}");
-    debugPrint("idImage: ${idImage?.path ?? 'null'}");
 
     if (kIsWeb) {
       if (userImageBytes != null) {
-        debugPrint("Adding user_image bytes to request");
         request.files.add(http.MultipartFile.fromBytes(
           "user_image",
           userImageBytes,
@@ -118,7 +132,6 @@ class AuthService {
         ));
       }
       if (idImageBytes != null) {
-        debugPrint("Adding id_image bytes to request");
         request.files.add(http.MultipartFile.fromBytes(
           "id_image",
           idImageBytes,
@@ -128,17 +141,12 @@ class AuthService {
       }
     } else {
       if (userImage != null) {
-        request.files.add(
-            await http.MultipartFile.fromPath("user_image", userImage.path));
+        request.files.add(await http.MultipartFile.fromPath("user_image", userImage.path));
       }
       if (idImage != null) {
-        request.files
-            .add(await http.MultipartFile.fromPath("id_image", idImage.path));
+        request.files.add(await http.MultipartFile.fromPath("id_image", idImage.path));
       }
     }
-
-    debugPrint("Total files in request: ${request.files.length}");
-    debugPrint("Fields: ${request.fields}");
 
     final response = await request.send();
     final responseBody = await response.stream.bytesToString();
@@ -146,14 +154,12 @@ class AuthService {
     debugPrint("Response status: ${response.statusCode}");
     debugPrint("Response body: $responseBody");
 
-    final bodyJson =
-    _tryDecodeJson(responseBody, response.headers["content-type"]);
+    final bodyJson = _tryDecodeJson(responseBody, response.headers["content-type"]);
 
     if (response.statusCode == 201 || response.statusCode == 200) {
       if (bodyJson['user'] != null) {
         return RegisterResponseModel.fromJson(bodyJson);
       }
-
       final cause = _extractErrorMessage(bodyJson);
       throw Exception(cause ?? "Register failed");
     }
@@ -161,9 +167,6 @@ class AuthService {
     final cause = _extractErrorMessage(bodyJson);
     if (cause != null) {
       throw Exception(cause);
-    }
-    if (responseBody.isNotEmpty && responseBody.trim().startsWith("<")) {
-      throw Exception("Server error (non-JSON response)");
     }
     throw Exception("Register failed");
   }

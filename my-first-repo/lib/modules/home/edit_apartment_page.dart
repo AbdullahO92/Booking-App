@@ -2,34 +2,36 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart';
 import 'package:cozy_app/controllers/owner_apartments_controller.dart';
+import 'package:cozy_app/modules/home/apartment_model.dart';
 
-class AddApartmentPage extends StatefulWidget {
-  const AddApartmentPage({super.key});
+class EditApartmentPage extends StatefulWidget {
+  final Apartment apartment;
+
+  const EditApartmentPage({super.key, required this.apartment});
 
   @override
-  State<AddApartmentPage> createState() => _AddApartmentPageState();
+  State<EditApartmentPage> createState() => _EditApartmentPageState();
 }
 
-class _AddApartmentPageState extends State<AddApartmentPage> {
+class _EditApartmentPageState extends State<EditApartmentPage> {
   final ownerController = Get.find<OwnerApartmentsController>();
   final _formKey = GlobalKey<FormState>();
 
-  final titleController = TextEditingController();
-  final descriptionController = TextEditingController();
-  final priceController = TextEditingController();
-  final roomsController = TextEditingController();
-  final areaController = TextEditingController();
+  late TextEditingController titleController;
+  late TextEditingController descriptionController;
+  late TextEditingController priceController;
+  late TextEditingController roomsController;
+  late TextEditingController areaController;
 
   int? selectedGovernorateId;
   int? selectedCityId;
 
-  List<Uint8List> selectedImages = [];
+  List<Uint8List> newImages = [];
+  List<String> existingImages = [];
   int mainImageIndex = 0;
   bool isLoading = false;
 
-  // قائمة المحافظات (يمكنك جلبها من API)
   final List<Map<String, dynamic>> governorates = [
     {'id': 1, 'name': 'Damascus'},
     {'id': 2, 'name': 'Rif Dimashq'},
@@ -39,7 +41,6 @@ class _AddApartmentPageState extends State<AddApartmentPage> {
     {'id': 6, 'name': 'Tartus'},
   ];
 
-  // قائمة المدن حسب المحافظة
   final Map<int, List<Map<String, dynamic>>> cities = {
     1: [
       {'id': 1, 'name': 'Damascus City'},
@@ -73,6 +74,47 @@ class _AddApartmentPageState extends State<AddApartmentPage> {
     ],
   };
 
+  @override
+  void initState() {
+    super.initState();
+    final a = widget.apartment;
+
+    titleController = TextEditingController(text: a.name);
+    descriptionController = TextEditingController(text: a.description ?? '');
+    priceController = TextEditingController(text: a.price.toStringAsFixed(0));
+    roomsController = TextEditingController(text: a.rooms.toString());
+    areaController = TextEditingController(text: '100'); // Default if not available
+
+    // تحديد المحافظة والمدينة من الاسم
+    _setGovernorateAndCity(a.governorate, a.city);
+
+    // الصور الموجودة
+    if (a.gallery != null && a.gallery!.isNotEmpty) {
+      existingImages = List.from(a.gallery!);
+    } else if (a.image.isNotEmpty) {
+      existingImages = [a.image];
+    }
+  }
+
+  void _setGovernorateAndCity(String govName, String cityName) {
+    for (var gov in governorates) {
+      if (gov['name'] == govName) {
+        selectedGovernorateId = gov['id'];
+        break;
+      }
+    }
+
+    if (selectedGovernorateId != null) {
+      final cityList = cities[selectedGovernorateId] ?? [];
+      for (var city in cityList) {
+        if (city['name'] == cityName) {
+          selectedCityId = city['id'];
+          break;
+        }
+      }
+    }
+  }
+
   Future<void> pickImages() async {
     final picker = ImagePicker();
     final pickedFiles = await picker.pickMultiImage();
@@ -81,26 +123,29 @@ class _AddApartmentPageState extends State<AddApartmentPage> {
       for (var file in pickedFiles) {
         final bytes = await file.readAsBytes();
         setState(() {
-          selectedImages.add(bytes);
+          newImages.add(bytes);
         });
       }
     }
   }
 
-  void removeImage(int index) {
+  void removeExistingImage(int index) {
     setState(() {
-      selectedImages.removeAt(index);
-      if (mainImageIndex >= selectedImages.length) {
-        mainImageIndex = selectedImages.isEmpty ? 0 : selectedImages.length - 1;
-      }
+      existingImages.removeAt(index);
     });
   }
 
-  Future<void> submitApartment() async {
+  void removeNewImage(int index) {
+    setState(() {
+      newImages.removeAt(index);
+    });
+  }
+
+  Future<void> submitUpdate() async {
     if (!_formKey.currentState!.validate()) return;
 
-    if (selectedImages.isEmpty) {
-      Get.snackbar("خطأ", "يجب إضافة صورة واحدة على الأقل",
+    if (existingImages.isEmpty && newImages.isEmpty) {
+      Get.snackbar("خطأ", "يجب وجود صورة واحدة على الأقل",
           backgroundColor: Colors.red, colorText: Colors.white);
       return;
     }
@@ -114,7 +159,8 @@ class _AddApartmentPageState extends State<AddApartmentPage> {
     setState(() => isLoading = true);
 
     try {
-      await ownerController.addApartment(
+      await ownerController.updateApartment(
+        apartmentId: widget.apartment.id,
         title: titleController.text.trim(),
         description: descriptionController.text.trim(),
         pricePerDay: double.parse(priceController.text.trim()),
@@ -122,12 +168,12 @@ class _AddApartmentPageState extends State<AddApartmentPage> {
         area: int.parse(areaController.text.trim()),
         governorateId: selectedGovernorateId!,
         cityId: selectedCityId!,
-        images: selectedImages,
+        newImages: newImages.isNotEmpty ? newImages : null,
         mainImageIndex: mainImageIndex,
       );
 
       Get.back();
-      Get.snackbar("نجاح", "تم إضافة الشقة بنجاح، في انتظار موافقة الإدارة",
+      Get.snackbar("نجاح", "تم تحديث الشقة بنجاح",
           backgroundColor: Colors.green, colorText: Colors.white);
     } catch (e) {
       Get.snackbar("خطأ", e.toString().replaceFirst('Exception: ', ''),
@@ -141,7 +187,7 @@ class _AddApartmentPageState extends State<AddApartmentPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("إضافة شقة جديدة"),
+        title: const Text("تعديل الشقة"),
         backgroundColor: Colors.teal,
         centerTitle: true,
       ),
@@ -271,17 +317,81 @@ class _AddApartmentPageState extends State<AddApartmentPage> {
               ),
               const SizedBox(height: 20),
 
-              // الصور
-              const Text("صور الشقة", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              // الصور الحالية
+              const Text("الصور الحالية",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
 
-              // عرض الصور المختارة
-              if (selectedImages.isNotEmpty)
+              if (existingImages.isNotEmpty)
                 SizedBox(
                   height: 120,
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
-                    itemCount: selectedImages.length,
+                    itemCount: existingImages.length,
+                    itemBuilder: (context, index) {
+                      return Stack(
+                        children: [
+                          Container(
+                            margin: const EdgeInsets.only(right: 8),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: Colors.grey),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(6),
+                              child: Image.network(
+                                existingImages[index],
+                                width: 100,
+                                height: 100,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                  width: 100,
+                                  height: 100,
+                                  color: Colors.grey.shade300,
+                                  child: const Icon(Icons.broken_image),
+                                ),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            top: 0,
+                            right: 8,
+                            child: GestureDetector(
+                              onTap: () => removeExistingImage(index),
+                              child: Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: const BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.close,
+                                    size: 16, color: Colors.white),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+
+              if (existingImages.isEmpty)
+                const Text("لا توجد صور حالية",
+                    style: TextStyle(color: Colors.grey)),
+
+              const SizedBox(height: 16),
+
+              // الصور الجديدة
+              const Text("صور جديدة",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+
+              if (newImages.isNotEmpty)
+                SizedBox(
+                  height: 120,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: newImages.length,
                     itemBuilder: (context, index) {
                       return Stack(
                         children: [
@@ -293,7 +403,9 @@ class _AddApartmentPageState extends State<AddApartmentPage> {
                               margin: const EdgeInsets.only(right: 8),
                               decoration: BoxDecoration(
                                 border: Border.all(
-                                  color: mainImageIndex == index ? Colors.teal : Colors.grey,
+                                  color: mainImageIndex == index
+                                      ? Colors.teal
+                                      : Colors.grey,
                                   width: mainImageIndex == index ? 3 : 1,
                                 ),
                                 borderRadius: BorderRadius.circular(8),
@@ -301,7 +413,7 @@ class _AddApartmentPageState extends State<AddApartmentPage> {
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(6),
                                 child: Image.memory(
-                                  selectedImages[index],
+                                  newImages[index],
                                   width: 100,
                                   height: 100,
                                   fit: BoxFit.cover,
@@ -313,14 +425,15 @@ class _AddApartmentPageState extends State<AddApartmentPage> {
                             top: 0,
                             right: 8,
                             child: GestureDetector(
-                              onTap: () => removeImage(index),
+                              onTap: () => removeNewImage(index),
                               child: Container(
                                 padding: const EdgeInsets.all(2),
                                 decoration: const BoxDecoration(
                                   color: Colors.red,
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(Icons.close, size: 16, color: Colors.white),
+                                child: const Icon(Icons.close,
+                                    size: 16, color: Colors.white),
                               ),
                             ),
                           ),
@@ -329,12 +442,15 @@ class _AddApartmentPageState extends State<AddApartmentPage> {
                               bottom: 4,
                               left: 4,
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 4, vertical: 2),
                                 decoration: BoxDecoration(
                                   color: Colors.teal,
                                   borderRadius: BorderRadius.circular(4),
                                 ),
-                                child: const Text("رئيسية", style: TextStyle(color: Colors.white, fontSize: 10)),
+                                child: const Text("رئيسية",
+                                    style: TextStyle(
+                                        color: Colors.white, fontSize: 10)),
                               ),
                             ),
                         ],
@@ -349,31 +465,31 @@ class _AddApartmentPageState extends State<AddApartmentPage> {
               OutlinedButton.icon(
                 onPressed: pickImages,
                 icon: const Icon(Icons.add_photo_alternate),
-                label: const Text("إضافة صور"),
+                label: const Text("إضافة صور جديدة"),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 48),
                 ),
               ),
               const SizedBox(height: 8),
               const Text(
-                "اضغط على الصورة لجعلها الصورة الرئيسية",
-                style: TextStyle(fontSize: 12, color: Colors.grey),
+                "إضافة صور جديدة ستستبدل الصور الحالية",
+                style: TextStyle(fontSize: 12, color: Colors.orange),
               ),
               const SizedBox(height: 24),
 
-              // زر الإضافة
+              // زر التحديث
               SizedBox(
                 width: double.infinity,
                 height: 50,
                 child: ElevatedButton(
-                  onPressed: isLoading ? null : submitApartment,
+                  onPressed: isLoading ? null : submitUpdate,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.teal,
                   ),
                   child: isLoading
                       ? const CircularProgressIndicator(color: Colors.white)
                       : const Text(
-                    "إضافة الشقة",
+                    "تحديث الشقة",
                     style: TextStyle(fontSize: 18, color: Colors.white),
                   ),
                 ),

@@ -43,7 +43,7 @@ class AuthController extends GetxController {
     update();
   }
 
-  //  LOGIN
+  // LOGIN
   Future<void> login() async {
     try {
       isLoading.value = true;
@@ -56,15 +56,30 @@ class AuthController extends GetxController {
       currentUser.value = res.user;
       token.value = res.token;
 
-      Get.offAllNamed(AppRoutes.mainPage);
+      // التوجيه حسب نوع المستخدم
+      _navigateBasedOnRole();
     } catch (_) {
-      Get.snackbar("خطأ", "بيانات الدخول غير صحيحة");
+      Get.snackbar("خطأ", "بيانات الدخول غير صحيحة",
+          backgroundColor: Colors.red, colorText: Colors.white);
     } finally {
       isLoading.value = false;
     }
   }
 
-  //  REGISTER
+  // التوجيه حسب دور المستخدم
+  void _navigateBasedOnRole() {
+    final role = currentUser.value?.role;
+
+    if (role == 'admin') {
+      // توجيه Admin إلى لوحة التحكم
+      Get.offAllNamed(AppRoutes.adminDashboard);
+    } else {
+      // توجيه المستأجر أو المالك إلى الصفحة الرئيسية
+      Get.offAllNamed(AppRoutes.mainPage);
+    }
+  }
+
+  // REGISTER
   Future<void> register() async {
     final hasProfileImage = kIsWeb
         ? profileImageBytes.value != null
@@ -72,7 +87,8 @@ class AuthController extends GetxController {
     final hasIdImage = kIsWeb ? idImageBytes.value != null : idImage.value != null;
 
     if (!hasProfileImage || !hasIdImage) {
-      Get.snackbar("خطأ", "الصور مطلوبة");
+      Get.snackbar("خطأ", "الصور مطلوبة",
+          backgroundColor: Colors.red, colorText: Colors.white);
       return;
     }
 
@@ -94,11 +110,13 @@ class AuthController extends GetxController {
 
       currentUser.value = res.user;
 
-      Get.snackbar("نجاح", res.message);
+      Get.snackbar("نجاح", res.message,
+          backgroundColor: Colors.green, colorText: Colors.white);
       Get.offAllNamed(AppRoutes.login);
     } catch (e) {
       final message = e.toString().replaceFirst('Exception: ', '');
-      Get.snackbar("خطأ", message.isEmpty ? "فشل إنشاء الحساب" : message);
+      Get.snackbar("خطأ", message.isEmpty ? "فشل إنشاء الحساب" : message,
+          backgroundColor: Colors.red, colorText: Colors.white);
     } finally {
       isLoading.value = false;
     }

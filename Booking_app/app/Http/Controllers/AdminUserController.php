@@ -9,67 +9,76 @@ use Illuminate\Http\Request;
 
 class AdminUserController extends Controller
 {
-    public function pendingUsers(){
-        return User::where('status','pending')->get();
+    // جلب المستخدمين المعلقين
+    public function pendingUsers()
+    {
+        return User::where('status', 'pending')->get();
     }
-    public function approveUser($id){
-        $user=User::findOrFail($id);
-        $user->status='approved';
+
+    // جلب جميع المستخدمين (ما عدا Admin)
+    public function allUsers()
+    {
+        return User::where('role', '!=', 'admin')
+            ->orderBy('created_at', 'desc')
+            ->get();
+    }
+
+    // قبول مستخدم
+    public function approveUser($id)
+    {
+        $user = User::findOrFail($id);
+        $user->status = 'approved';
         $user->save();
+
         return response()->json([
-            'message'=>'user approved successfully',
-            'user'=>$user
+            'message' => 'User approved successfully',
+            'user' => $user
         ]);
     }
-    public function rejectUser($id){
-        $user=User::findOrFail($id);
-        $user->status='rejected';
+
+    // رفض مستخدم
+    public function rejectUser($id)
+    {
+        $user = User::findOrFail($id);
+        $user->status = 'rejected';
         $user->save();
+
         return response()->json([
-            'message'=>'user rejected ',
-            'user'=>$user
+            'message' => 'User rejected',
+            'user' => $user
         ]);
     }
-    ////pending arpartment
-    public function pendingApartment(){
-           $apartment = Apartment::where('status', 'pending')
-                           ->with('owner', 'images', 'mainImage')
-                           ->get();
 
-        return response()->json($apartment);
+    // حذف مستخدم
+    public function deleteUser($id)
+    {
+        $user = User::findOrFail($id);
+
+        // منع حذف Admin
+        if ($user->role === 'admin') {
+            return response()->json([
+                'message' => 'Cannot delete admin user'
+            ], 403);
+        }
+
+        // حذف شقق المستخدم إذا كان مالك
+        if ($user->role === 'owner') {
+            // حذف صور الشقق أولاً
+            foreach ($user->apartments as $apartment) {
+                $apartment->images()->delete();
+            }
+            // حذف الشقق
+            $user->apartments()->delete();
+        }
+
+        // حذف حجوزات المستخدم
+        $user->bookings()->delete();
+
+        // حذف المستخدم
+        $user->delete();
+
+        return response()->json([
+            'message' => 'User deleted successfully'
+        ]);
     }
-    ///approved apartment
-//     public function approvedApartment($id){
-
-//     $apartment = Apartment::findOrFail($id);
-
-//     if ($apartment->status !== 'pending') {
-//         return response()->json([
-//             'message' => 'This apartment is already processed'
-//         ], 400);
-//     }
-
-//     $apartment->status = 'approved';
-//     $apartment->save();
-
-//     return response()->json([
-//         'message' => 'Apartment approved successfully',
-//         'apartment' => $apartment
-//     ]);
-// }
-// public function rejectedapartment($id){
-//      $apartment = Apartment::findOrFail($id);
-//       if ($apartment->status !== 'pending') {
-//         return response()->json([
-//             'message' => 'This apartment is already processed'
-//         ], 400);
-//     }
-//     $apartment->status = 'rejected';
-//     $apartment->save();
-//       return response()->json([
-//         'message' => 'Apartment rejected  successfully',
-//         'apartment' => $apartment
-//     ]);
-// }
-
-    }
+}

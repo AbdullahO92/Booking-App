@@ -13,12 +13,24 @@ class RoleMiddleware
      *
      * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
      */
-    public function handle(Request $request, Closure $next, $role ): Response
+    public function handle(Request $request, Closure $next, string $role): Response
     {
-        if(!$request->user() || $request->user()->role !== $role){
+        // التحقق من تسجيل الدخول
+        if (!$request->user()) {
             return response()->json([
-        'message'=>'Unthauthorized Admin only'],
-         403);}
+                'message' => 'Unauthenticated'
+            ], 401);
+        }
+
+        // التحقق من الدور
+        if ($request->user()->role !== $role) {
+            return response()->json([
+                'message' => 'Unauthorized. You do not have permission to access this resource.',
+                'required_role' => $role,
+                'your_role' => $request->user()->role
+            ], 403);
+        }
+
         return $next($request);
     }
 }

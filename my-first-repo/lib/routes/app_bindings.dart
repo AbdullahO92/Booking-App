@@ -1,5 +1,5 @@
 import 'package:cozy_app/controllers/auth_controller.dart';
-import 'package:cozy_app/controllers/bokking_controller.dart';
+import 'package:cozy_app/controllers/booking_controller.dart';
 import 'package:cozy_app/controllers/favorites_controller.dart';
 import 'package:cozy_app/controllers/owner_apartments_controller.dart';
 import 'package:cozy_app/controllers/admin_controller.dart';

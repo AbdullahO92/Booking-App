@@ -1,4 +1,6 @@
 import 'package:cozy_app/controllers/auth_controller.dart';
+import 'package:cozy_app/controllers/theme_controller.dart';
+import 'package:cozy_app/config/app_themes.dart';
 import 'package:cozy_app/OnboardingScreens/onboarding.dart';
 import 'package:cozy_app/modules/auth/login_page.dart';
 import 'package:cozy_app/modules/auth/register_page.dart';
@@ -13,7 +15,12 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   AppBindings().dependencies();
+
+  // تسجيل ThemeController
+  Get.put(ThemeController());
+
   runApp(const MyApp());
 }
 
@@ -23,6 +30,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authController = Get.find<AuthController>();
+    final themeController = Get.find<ThemeController>();
 
     // تحديد الصفحة الأولى حسب حالة تسجيل الدخول ونوع المستخدم
     String initialRoute;
@@ -36,13 +44,15 @@ class MyApp extends StatelessWidget {
       initialRoute = AppRoutes.OnBoardingBody;
     }
 
-    return GetMaterialApp(
+    return Obx(() => GetMaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Cozy App',
-      theme: ThemeData(
-        primarySwatch: Colors.teal,
-        fontFamily: 'Cairo',
-      ),
+
+      // الثيمات
+      theme: AppThemes.lightTheme,
+      darkTheme: AppThemes.darkTheme,
+      themeMode: themeController.isDarkMode.value ? ThemeMode.dark : ThemeMode.light,
+
       initialRoute: initialRoute,
       getPages: [
         // Auth Routes
@@ -59,6 +69,6 @@ class MyApp extends StatelessWidget {
         GetPage(name: AppRoutes.approveUsers, page: () => const ApproveUsersPage()),
         GetPage(name: AppRoutes.approveApartments, page: () => const ApproveApartmentsPage()),
       ],
-    );
+    ));
   }
 }

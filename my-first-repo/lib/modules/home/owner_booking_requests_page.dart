@@ -68,6 +68,11 @@ class _OwnerBookingRequestsPageState extends State<OwnerBookingRequestsPage> {
     final user = booking['user'] ?? {};
     final apartment = booking['apartment'] ?? {};
 
+    // التحقق إذا كان طلب تعديل (تم تحديثه بعد إنشائه)
+    final createdAt = booking['created_at'] ?? '';
+    final updatedAt = booking['updated_at'] ?? '';
+    final bool isModificationRequest = createdAt != updatedAt && createdAt.isNotEmpty;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 3,
@@ -77,6 +82,34 @@ class _OwnerBookingRequestsPageState extends State<OwnerBookingRequestsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // شارة طلب التعديل
+            if (isModificationRequest) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade100,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.orange.shade300),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.edit_note, size: 18, color: Colors.orange.shade700),
+                    const SizedBox(width: 6),
+                    Text(
+                      "طلب تعديل حجز",
+                      style: TextStyle(
+                        color: Colors.orange.shade700,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+
             // معلومات الشقة
             Row(
               children: [
@@ -88,6 +121,19 @@ class _OwnerBookingRequestsPageState extends State<OwnerBookingRequestsPage> {
                     style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),
+                // شارة صغيرة للتعديل
+                if (isModificationRequest)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.orange,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      "تعديل",
+                      style: TextStyle(color: Colors.white, fontSize: 11),
+                    ),
+                  ),
               ],
             ),
             const Divider(),
@@ -123,28 +169,49 @@ class _OwnerBookingRequestsPageState extends State<OwnerBookingRequestsPage> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.grey.shade100,
+                color: isModificationRequest
+                    ? Colors.orange.shade50
+                    : Colors.grey.shade100,
                 borderRadius: BorderRadius.circular(8),
+                border: isModificationRequest
+                    ? Border.all(color: Colors.orange.shade200)
+                    : null,
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
+              child: Column(
                 children: [
-                  Column(
-                    children: [
-                      const Text("من", style: TextStyle(color: Colors.grey)),
-                      Text(
-                        booking['from'] ?? '',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                  if (isModificationRequest)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        "التواريخ الجديدة المطلوبة",
+                        style: TextStyle(
+                          color: Colors.orange.shade700,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                    ],
-                  ),
-                  const Icon(Icons.arrow_forward, color: Colors.teal),
-                  Column(
+                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      const Text("إلى", style: TextStyle(color: Colors.grey)),
-                      Text(
-                        booking['to'] ?? '',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      Column(
+                        children: [
+                          const Text("من", style: TextStyle(color: Colors.grey)),
+                          Text(
+                            booking['from'] ?? '',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                      const Icon(Icons.arrow_forward, color: Colors.teal),
+                      Column(
+                        children: [
+                          const Text("إلى", style: TextStyle(color: Colors.grey)),
+                          Text(
+                            booking['to'] ?? '',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -158,9 +225,12 @@ class _OwnerBookingRequestsPageState extends State<OwnerBookingRequestsPage> {
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => _approveBooking(booking['id']),
+                    onPressed: () => _approveBooking(booking['id'], isModificationRequest),
                     icon: const Icon(Icons.check, color: Colors.white),
-                    label: const Text("قبول", style: TextStyle(color: Colors.white)),
+                    label: Text(
+                      isModificationRequest ? "قبول التعديل" : "قبول",
+                      style: const TextStyle(color: Colors.white),
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green,
                       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -170,9 +240,12 @@ class _OwnerBookingRequestsPageState extends State<OwnerBookingRequestsPage> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => _rejectBooking(booking['id']),
+                    onPressed: () => _rejectBooking(booking['id'], isModificationRequest),
                     icon: const Icon(Icons.close, color: Colors.white),
-                    label: const Text("رفض", style: TextStyle(color: Colors.white)),
+                    label: Text(
+                      isModificationRequest ? "رفض التعديل" : "رفض",
+                      style: const TextStyle(color: Colors.white),
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.red,
                       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -187,10 +260,12 @@ class _OwnerBookingRequestsPageState extends State<OwnerBookingRequestsPage> {
     );
   }
 
-  void _approveBooking(int bookingId) {
+  void _approveBooking(int bookingId, bool isModification) {
     Get.defaultDialog(
-      title: "تأكيد القبول",
-      middleText: "هل تريد قبول هذا الحجز؟",
+      title: isModification ? "تأكيد قبول التعديل" : "تأكيد القبول",
+      middleText: isModification
+          ? "هل تريد قبول تعديل هذا الحجز؟"
+          : "هل تريد قبول هذا الحجز؟",
       textConfirm: "قبول",
       textCancel: "إلغاء",
       confirmTextColor: Colors.white,
@@ -199,8 +274,12 @@ class _OwnerBookingRequestsPageState extends State<OwnerBookingRequestsPage> {
         Get.back();
         try {
           await ownerController.approveBooking(bookingId);
-          Get.snackbar("تم", "تم قبول الحجز بنجاح",
-              backgroundColor: Colors.green, colorText: Colors.white);
+          Get.snackbar(
+            "تم",
+            isModification ? "تم قبول تعديل الحجز بنجاح" : "تم قبول الحجز بنجاح",
+            backgroundColor: Colors.green,
+            colorText: Colors.white,
+          );
         } catch (e) {
           Get.snackbar("خطأ", e.toString(),
               backgroundColor: Colors.red, colorText: Colors.white);
@@ -209,10 +288,12 @@ class _OwnerBookingRequestsPageState extends State<OwnerBookingRequestsPage> {
     );
   }
 
-  void _rejectBooking(int bookingId) {
+  void _rejectBooking(int bookingId, bool isModification) {
     Get.defaultDialog(
-      title: "تأكيد الرفض",
-      middleText: "هل تريد رفض هذا الحجز؟",
+      title: isModification ? "تأكيد رفض التعديل" : "تأكيد الرفض",
+      middleText: isModification
+          ? "هل تريد رفض تعديل هذا الحجز؟"
+          : "هل تريد رفض هذا الحجز؟",
       textConfirm: "رفض",
       textCancel: "إلغاء",
       confirmTextColor: Colors.white,
@@ -221,8 +302,12 @@ class _OwnerBookingRequestsPageState extends State<OwnerBookingRequestsPage> {
         Get.back();
         try {
           await ownerController.rejectBooking(bookingId);
-          Get.snackbar("تم", "تم رفض الحجز",
-              backgroundColor: Colors.orange, colorText: Colors.white);
+          Get.snackbar(
+            "تم",
+            isModification ? "تم رفض تعديل الحجز" : "تم رفض الحجز",
+            backgroundColor: Colors.orange,
+            colorText: Colors.white,
+          );
         } catch (e) {
           Get.snackbar("خطأ", e.toString(),
               backgroundColor: Colors.red, colorText: Colors.white);

@@ -1,44 +1,40 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-
-import 'package:cozy_app/controllers/bokking_controller.dart';
-import 'package:cozy_app/data/models/booking.dart';
-import 'package:cozy_app/modules/booking/my_bookings_page.dart';
-
-import '../../controllers/auth_controller.dart';
-import '../../modules/home/apartment_model.dart';
+import 'package:cozy_app/controllers/booking_controller.dart';
+import 'package:cozy_app/controllers/auth_controller.dart';
+import 'package:cozy_app/modules/home/apartment_model.dart';
 
 class BookingPage extends StatefulWidget {
   final Apartment apartment;
-  final Booking? oldBooking;
+  final Map<String, dynamic>? existingBooking;
 
   const BookingPage({
-    Key? key,
+    super.key,
     required this.apartment,
-    this.oldBooking,
-  }) : super(key: key);
+    this.existingBooking,
+  });
 
   @override
   State<BookingPage> createState() => _BookingPageState();
 }
 
 class _BookingPageState extends State<BookingPage> {
-  final BookingController bookingController = Get.put(BookingController());
-  final AuthController authController = Get.find();
+  final bookingController = Get.find<BookingController>();
+  final authController = Get.find<AuthController>();
 
   DateTime? fromDate;
   DateTime? toDate;
-  int guests = 1;
+  bool isLoading = false;
 
   @override
   void initState() {
     super.initState();
     _checkIfOwner();
 
-    if (widget.oldBooking != null) {
-      fromDate = widget.oldBooking!.fromDate;
-      toDate = widget.oldBooking!.toDate;
-      guests = widget.oldBooking!.guests;
+    // إذا كان تعديل على حجز موجود
+    if (widget.existingBooking != null) {
+      fromDate = DateTime.parse(widget.existingBooking!['from']);
+      toDate = DateTime.parse(widget.existingBooking!['to']);
     }
   }
 
@@ -61,7 +57,7 @@ class _BookingPageState extends State<BookingPage> {
     }
   }
 
-  Future<void> pickFromDate() async {
+  Future<void> _pickFromDate() async {
     final now = DateTime.now();
     final picked = await showDatePicker(
       context: context,
@@ -69,10 +65,18 @@ class _BookingPageState extends State<BookingPage> {
       firstDate: now,
       lastDate: DateTime(now.year + 2),
     );
-    if (picked != null) setState(() => fromDate = picked);
+    if (picked != null) {
+      setState(() {
+        fromDate = picked;
+        // إعادة تعيين تاريخ المغادرة إذا كان قبل تاريخ الوصول الجديد
+        if (toDate != null && toDate!.isBefore(picked)) {
+          toDate = null;
+        }
+      });
+    }
   }
 
-  Future<void> pickToDate() async {
+  Future<void> _pickToDate() async {
     final start = fromDate ?? DateTime.now();
     final picked = await showDatePicker(
       context: context,
@@ -83,19 +87,18 @@ class _BookingPageState extends State<BookingPage> {
     if (picked != null) setState(() => toDate = picked);
   }
 
-  int getNights() {
+  int _getNights() {
     if (fromDate == null || toDate == null) return 0;
-    final diff = toDate!.difference(fromDate!).inDays;
-    return diff > 0 ? diff : 0;
+    return toDate!.difference(fromDate!).inDays;
   }
 
-  double getTotal() {
-    final nights = getNights();
-    final pricePerNight = widget.apartment.price.toDouble();
-    return (nights > 0 ? nights : 1) * pricePerNight;
+  double _getTotal() {
+    final nights = _getNights();
+    return (nights > 0 ? nights : 1) * widget.apartment.price;
   }
 
-  void handleBookNow() {
+  Future<void> _handleBooking() async {
+    // التحقق من أن المستخدم ليس المالك
     final currentUserPhone = authController.currentUser.value?.phone;
     final apartmentOwnerPhone = widget.apartment.ownerPhone;
 
@@ -107,37 +110,71 @@ class _BookingPageState extends State<BookingPage> {
       return;
     }
 
+    // التحقق من التواريخ
     if (fromDate == null || toDate == null) {
-      Get.snackbar('خطأ', 'اختر تاريخ الوصول والمغادرة',
+      Get.snackbar("خطأ", "يرجى اختيار تاريخ الوصول والمغادرة",
           backgroundColor: Colors.orange, colorText: Colors.white);
       return;
     }
 
-    if (widget.oldBooking != null) {
-      bookingController.cancelBooking(widget.oldBooking!.id);
+    setState(() => isLoading = true);
+
+    try {
+      if (widget.existingBooking != null) {
+        // تعديل حجز موجود
+        await bookingController.updateBooking(
+          bookingId: widget.existingBooking!['id'],
+          fromDate: fromDate!,
+          toDate: toDate!,
+        );
+        Get.back();
+        Get.snackbar("تم", "تم تعديل الحجز بنجاح",
+            backgroundColor: Colors.green, colorText: Colors.white);
+      } else {
+        // إنشاء حجز جديد
+        await bookingController.createBooking(
+          apartmentId: widget.apartment.id,
+          fromDate: fromDate!,
+          toDate: toDate!,
+        );
+        Get.back();
+        Get.snackbar("تم", "تم إرسال طلب الحجز بنجاح\nفي انتظار موافقة المالك",
+            backgroundColor: Colors.green, colorText: Colors.white);
+      }
+    } catch (e) {
+      Get.snackbar("خطأ", e.toString().replaceFirst('Exception: ', ''),
+          backgroundColor: Colors.red, colorText: Colors.white);
+    } finally {
+      setState(() => isLoading = false);
     }
-
-    bookingController.createBooking(
-      apartment: widget.apartment,
-      from: fromDate!,
-      to: toDate!,
-      guests: guests,
-    );
-
-    Get.snackbar('تم',
-        widget.oldBooking != null ? 'تم تعديل الحجز بنجاح' : 'تم إنشاء الحجز بنجاح',
-        backgroundColor: Colors.green, colorText: Colors.white);
-
-    Get.off(() => MyBookingsPage());
   }
 
-  void handleCancelBooking() {
-    if (widget.oldBooking != null) {
-      bookingController.cancelBooking(widget.oldBooking!.id);
-      Get.snackbar('تم', 'تم إلغاء الحجز',
-          backgroundColor: Colors.red, colorText: Colors.white);
-      Get.off(() => MyBookingsPage());
-    }
+  Future<void> _handleCancel() async {
+    if (widget.existingBooking == null) return;
+
+    Get.defaultDialog(
+      title: "تأكيد الإلغاء",
+      middleText: "هل تريد إلغاء هذا الحجز؟",
+      textConfirm: "إلغاء الحجز",
+      textCancel: "تراجع",
+      confirmTextColor: Colors.white,
+      buttonColor: Colors.red,
+      onConfirm: () async {
+        Get.back();
+        setState(() => isLoading = true);
+        try {
+          await bookingController.cancelBooking(widget.existingBooking!['id']);
+          Get.back();
+          Get.snackbar("تم", "تم إلغاء الحجز",
+              backgroundColor: Colors.orange, colorText: Colors.white);
+        } catch (e) {
+          Get.snackbar("خطأ", e.toString().replaceFirst('Exception: ', ''),
+              backgroundColor: Colors.red, colorText: Colors.white);
+        } finally {
+          setState(() => isLoading = false);
+        }
+      },
+    );
   }
 
   Widget _buildImage(String path) {
@@ -179,129 +216,210 @@ class _BookingPageState extends State<BookingPage> {
   @override
   Widget build(BuildContext context) {
     final apt = widget.apartment;
+    final isEditing = widget.existingBooking != null;
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.oldBooking != null
-            ? 'Edit Booking - ${apt.name}'
-            : 'Book - ${apt.name}'),
+        title: Text(isEditing ? "تعديل الحجز" : "حجز الشقة"),
         backgroundColor: Colors.teal,
+        centerTitle: true,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // صورة الشقة
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child: _buildImage(apt.image),
             ),
-            const SizedBox(height: 12),
-            Text(apt.name,
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 6),
-            Text('\$${apt.price.toStringAsFixed(0)} per night',
-                style: const TextStyle(fontSize: 16, color: Colors.green)),
-            const SizedBox(height: 6),
-            if (apt.ownerPhone != null && apt.ownerPhone!.isNotEmpty)
-              Text('Owner: ${apt.ownerPhone}',
-                  style: const TextStyle(fontSize: 14, color: Colors.black54)),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
 
-            const Text('From', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 6),
-            Row(children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: pickFromDate,
-                  child: Text(fromDate == null
-                      ? 'Choose arrival date'
-                      : fromDate!.toLocal().toString().split(' ')[0]),
-                ),
-              ),
-            ]),
-            const SizedBox(height: 12),
-
-            const Text('To', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 6),
-            Row(children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: pickToDate,
-                  child: Text(toDate == null
-                      ? 'Choose departure date'
-                      : toDate!.toLocal().toString().split(' ')[0]),
-                ),
-              ),
-            ]),
-            const SizedBox(height: 12),
-
+            // معلومات الشقة
+            Text(
+              apt.name,
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Guests', style: TextStyle(fontWeight: FontWeight.bold)),
-                Row(children: [
-                  IconButton(
-                    onPressed: () => setState(() {
-                      if (guests > 1) guests--;
-                    }),
-                    icon: const Icon(Icons.remove_circle_outline),
-                  ),
-                  Text('$guests'),
-                  IconButton(
-                    onPressed: () => setState(() => guests++),
-                    icon: const Icon(Icons.add_circle_outline),
-                  ),
-                ]),
+                const Icon(Icons.location_on, size: 18, color: Colors.grey),
+                const SizedBox(width: 4),
+                Text(
+                  apt.governorate.isNotEmpty
+                      ? "${apt.governorate} - ${apt.city}"
+                      : "غير محدد",
+                  style: const TextStyle(color: Colors.grey),
+                ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 8),
+            Text(
+              "\$${apt.price.toStringAsFixed(0)} / ليلة",
+              style: const TextStyle(
+                fontSize: 18,
+                color: Colors.teal,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 24),
 
-            Card(
-              color: Colors.grey[100],
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+            // اختيار التواريخ
+            const Text(
+              "تاريخ الوصول",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 8),
+            InkWell(
+              onTap: _pickFromDate,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
                   children: [
-                    Text('Nights: ${getNights()}'),
-                    const SizedBox(height: 6),
-                    Text('Price per night: \$${apt.price.toStringAsFixed(0)}'),
-                    const SizedBox(height: 6),
-                    Text('Total: \$${getTotal().toStringAsFixed(2)}',
-                        style: const TextStyle(fontWeight: FontWeight.bold)),
+                    const Icon(Icons.calendar_today, color: Colors.teal),
+                    const SizedBox(width: 12),
+                    Text(
+                      fromDate != null
+                          ? "${fromDate!.year}-${fromDate!.month.toString().padLeft(2, '0')}-${fromDate!.day.toString().padLeft(2, '0')}"
+                          : "اختر تاريخ الوصول",
+                      style: TextStyle(
+                        color: fromDate != null ? Colors.black : Colors.grey,
+                      ),
+                    ),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
 
-            Row(children: [
-              Expanded(
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.teal,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                  onPressed: handleBookNow,
-                  child: Text(
-                      widget.oldBooking != null ? 'Update Booking' : 'Book Now',
-                      style: const TextStyle(fontSize: 18, color: Colors.white)),
+            const Text(
+              "تاريخ المغادرة",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 8),
+            InkWell(
+              onTap: _pickToDate,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.calendar_today, color: Colors.teal),
+                    const SizedBox(width: 12),
+                    Text(
+                      toDate != null
+                          ? "${toDate!.year}-${toDate!.month.toString().padLeft(2, '0')}-${toDate!.day.toString().padLeft(2, '0')}"
+                          : "اختر تاريخ المغادرة",
+                      style: TextStyle(
+                        color: toDate != null ? Colors.black : Colors.grey,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              if (widget.oldBooking != null) ...[
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                    onPressed: handleCancelBooking,
-                    child: const Text('Cancel',
-                        style: TextStyle(fontSize: 18, color: Colors.white)),
+            ),
+            const SizedBox(height: 24),
+
+            // ملخص الحجز
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  _buildSummaryRow("عدد الليالي", "${_getNights()} ليلة"),
+                  const Divider(),
+                  _buildSummaryRow(
+                      "سعر الليلة", "\$${apt.price.toStringAsFixed(0)}"),
+                  const Divider(),
+                  _buildSummaryRow(
+                    "الإجمالي",
+                    "\$${_getTotal().toStringAsFixed(0)}",
+                    isBold: true,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // أزرار الحجز
+            SizedBox(
+              width: double.infinity,
+              height: 50,
+              child: ElevatedButton(
+                onPressed: isLoading ? null : _handleBooking,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.teal,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-              ]
-            ]),
+                child: isLoading
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : Text(
+                  isEditing ? "تحديث الحجز" : "إرسال طلب الحجز",
+                  style:
+                  const TextStyle(fontSize: 18, color: Colors.white),
+                ),
+              ),
+            ),
+
+            // زر الإلغاء (فقط في حالة التعديل)
+            if (isEditing) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: OutlinedButton(
+                  onPressed: isLoading ? null : _handleCancel,
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.red),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text(
+                    "إلغاء الحجز",
+                    style: TextStyle(fontSize: 18, color: Colors.red),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildSummaryRow(String label, String value, {bool isBold = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(color: Colors.grey)),
+          Text(
+            value,
+            style: TextStyle(
+              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+              fontSize: isBold ? 18 : 14,
+              color: isBold ? Colors.teal : Colors.black,
+            ),
+          ),
+        ],
       ),
     );
   }

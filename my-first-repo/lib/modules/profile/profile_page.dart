@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../controllers/auth_controller.dart';
+import '../../controllers/theme_controller.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -11,13 +12,14 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   final authController = Get.find<AuthController>();
+  final themeController = Get.find<ThemeController>();
 
   @override
   Widget build(BuildContext context) {
     final user = authController.currentUser.value;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: const Color.fromARGB(255, 238, 248, 247),
       appBar: AppBar(
         title: const Text("الملف الشخصي"),
         backgroundColor: Colors.teal,
@@ -45,10 +47,10 @@ class _ProfilePageState extends State<ProfilePage> {
             // اسم المستخدم
             Text(
               "${user?.firstName ?? ''} ${user?.lastName ?? ''}",
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
-                color: Colors.teal,
+                color: isDark ? Colors.teal.shade200 : Colors.teal,
               ),
             ),
             const SizedBox(height: 5),
@@ -86,6 +88,61 @@ class _ProfilePageState extends State<ProfilePage> {
                       "حالة الحساب",
                       _getStatusText(user?.status),
                     ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // بطاقة الإعدادات
+            Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 10),
+                      child: Text(
+                        "الإعدادات",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    // زر الوضع الليلي
+                    Obx(() => ListTile(
+                      leading: Icon(
+                        themeController.isDarkMode.value
+                            ? Icons.dark_mode
+                            : Icons.light_mode,
+                        color: Colors.teal,
+                      ),
+                      title: const Text("الوضع الليلي"),
+                      subtitle: Text(
+                        themeController.isDarkMode.value
+                            ? "مفعّل"
+                            : "معطّل",
+                        style: TextStyle(
+                          color: isDark ? Colors.grey.shade400 : Colors.grey,
+                        ),
+                      ),
+                      trailing: Switch(
+                        value: themeController.isDarkMode.value,
+                        onChanged: (value) {
+                          themeController.toggleTheme();
+                        },
+                        activeColor: Colors.teal,
+                      ),
+                      onTap: () {
+                        themeController.toggleTheme();
+                      },
+                    )),
                   ],
                 ),
               ),
@@ -196,7 +253,7 @@ class _ProfilePageState extends State<ProfilePage> {
   String _getStatusText(String? status) {
     switch (status) {
       case 'approved':
-        return 'مفعّل ✓';
+        return 'مفعّل ✔';
       case 'pending':
         return 'قيد الانتظار';
       case 'rejected':

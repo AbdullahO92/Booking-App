@@ -59,3 +59,11 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::put('/admin/apartment/{id}/approve', [AdminApartmentController::class, 'approvedApartment']);
     Route::put('/admin/apartment/{id}/reject', [AdminApartmentController::class, 'rejectedapartment']);
 });
+
+// المفضلة
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/favorites', [\App\Http\Controllers\FavoriteController::class, 'index']);
+    Route::post('/favorites', [\App\Http\Controllers\FavoriteController::class, 'store']);
+    Route::delete('/favorites/{apartmentId}', [\App\Http\Controllers\FavoriteController::class, 'destroy']);
+    Route::get('/favorites/check/{apartmentId}', [\App\Http\Controllers\FavoriteController::class, 'check']);
+});

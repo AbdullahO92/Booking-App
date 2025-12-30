@@ -8,26 +8,17 @@ use Symfony\Component\HttpFoundation\Response;
 
 class RoleMiddleware
 {
-    /**
-     * Handle an incoming request.
-     *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
-     */
     public function handle(Request $request, Closure $next, string $role): Response
     {
-        // التحقق من تسجيل الدخول
         if (!$request->user()) {
             return response()->json([
                 'message' => 'Unauthenticated'
             ], 401);
         }
 
-        // التحقق من الدور
         if ($request->user()->role !== $role) {
             return response()->json([
-                'message' => 'Unauthorized. You do not have permission to access this resource.',
-                'required_role' => $role,
-                'your_role' => $request->user()->role
+                'message' => 'Unauthorized',
             ], 403);
         }
 

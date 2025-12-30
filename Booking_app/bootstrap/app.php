@@ -13,7 +13,6 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // تسجيل middleware للـ role
         $middleware->alias([
             'role' => \App\Http\Middleware\RoleMiddleware::class,
         ]);
@@ -23,10 +22,8 @@ return Application::configure(basePath: dirname(__DIR__))
             if (! $request->is('api/*')) {
                 return null;
             }
-
             $status = $e instanceof HttpExceptionInterface ? $e->getStatusCode() : 500;
             $message = $status === 500 ? 'Server error: ' . $e->getMessage() : $e->getMessage();
-
             return response()->json([
                 'message' => 'error',
                 'cause' => $message,
